@@ -15,6 +15,8 @@ import java.net.*;
 import java.text.DecimalFormat;
 import java.util.StringTokenizer;
 
+import static de.htwdresden.Texts.receivedBytes;
+
 public class Client {
 
     //GUI
@@ -32,6 +34,9 @@ public class Client {
     JLabel lostPacketsLabel = new JLabel();
     JLabel dateRateLabel = new JLabel();
     ImageIcon icon;
+
+    //Helper classes
+    Statistic stats;
 
 
     //RTP variables:
@@ -73,7 +78,6 @@ public class Client {
     //Constructor
     //--------------------------
     public Client() {
-
         //build GUI
         //--------------------------
 
@@ -96,7 +100,7 @@ public class Client {
         tearButton.addActionListener(new tearButtonListener());
 
         //Statistics
-        receivedBytesLabel.setText(Texts.receivedBytes +"0");
+        receivedBytesLabel.setText(receivedBytes +"0");
         lostPacketsLabel.setText(Texts.lostPackets + "0");
         dateRateLabel.setText(Texts.dateRate + "0");
         mainPanel.add(receivedBytesLabel);
@@ -212,7 +216,9 @@ public class Client {
         public void actionPerformed(ActionEvent e) {
 
             System.out.println("Play Button pressed !");
+            ;
 
+            stats = Statistic.start();
             if (state == READY) {
 
                 inkSeqNr();
@@ -298,6 +304,7 @@ public class Client {
     //Handler for timer
     //------------------------------------
 
+    int statExpRtpNb;           //Expected Sequence number of RTP messages within the session
     private class timerListener implements ActionListener {
         public void actionPerformed(ActionEvent e) {
 
@@ -310,6 +317,7 @@ public class Client {
 
                 //create an RTPpacket object from the DP
                 RTPpacket rtp_packet = new RTPpacket(rcvdp.getData(), rcvdp.getLength());
+                int seqNr = rtp_packet.getsequencenumber();
 
                 //print important header fields of the RTP packet received:
                 System.out.println("Got RTP packet with SeqNum # " + rtp_packet.getsequencenumber() + " TimeStamp " + rtp_packet.gettimestamp() + " ms, of type " + rtp_packet.getpayloadtype());
@@ -322,6 +330,18 @@ public class Client {
                 byte[] payload = new byte[payload_length];
                 rtp_packet.getpayload(payload);
 
+                //STATISTIC
+                statExpRtpNb++;
+
+                if (seqNr > stats.getHighestSeqNr()) {
+                    stats.setHighestSeqNr(seqNr);
+                }
+                if (statExpRtpNb != seqNr) {
+                    stats.incrementPacketsLost();
+                }
+
+                stats.increaseTotalBytes(payload_length);
+                updateStatsGui();
                 //get an Image object from the payload bitstream
                 Toolkit toolkit = Toolkit.getDefaultToolkit();
                 Image image = toolkit.createImage(payload, 0, payload_length);
@@ -407,11 +427,11 @@ public class Client {
         return "CSeq: " + rtspSeqNb;
     }
 
-    private void updateStatsLabel() {
+    private void updateStatsGui() {
         DecimalFormat formatter = new DecimalFormat("###,###.##");
-        /*receivedBytesLabel.setText(Texts.receivedBytes + statTotalBytes);
-        lostPacketsLabel.setText(Texts.lostPackets + formatter.format(statFractionLost));
-        dateRateLabel.setText(Texts.dateRate + formatter.format(statDataRate) );*/
+        receivedBytesLabel.setText(Texts.receivedBytes + stats.getTotalBytes());
+        lostPacketsLabel.setText(Texts.lostPackets + formatter.format(stats.getPacketsLostFraction()));
+        dateRateLabel.setText(Texts.dateRate + formatter.format(stats.getDataRate()) );
     }
 
 }//end of Class Client
