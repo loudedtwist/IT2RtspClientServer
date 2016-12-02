@@ -38,6 +38,10 @@ public class Statistic {
         return (float) packetsLost / highestSeqNr;
     }
 
+    public int getLostPackets() {
+        return packetsLost;
+    }
+
     public void setHighestSeqNr(int newHighestNr) {
         highestSeqNr = newHighestNr;
     }

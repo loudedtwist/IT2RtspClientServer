@@ -1,8 +1,11 @@
-package de.htwdresden;
+package de.htwdresden.client;
 /* ------------------
    Client
    usage: java Client [Server hostname] [Server RTSP listening port] [Video file requested]
    ---------------------- */
+
+import de.htwdresden.Statistic;
+import de.htwdresden.Texts;
 
 import javax.swing.*;
 import java.awt.*;
@@ -15,28 +18,30 @@ import java.net.*;
 import java.text.DecimalFormat;
 import java.util.StringTokenizer;
 
-import static de.htwdresden.Texts.receivedBytes;
-
-public class Client {
+public class Client implements ClientView {
 
     //GUI
     //----
     JFrame f = new JFrame("Client");
+    JButton optButton = new JButton("Options");
     JButton setupButton = new JButton("Setup");
     JButton playButton = new JButton("Play");
     JButton pauseButton = new JButton("Pause");
     JButton tearButton = new JButton("Teardown");
+
     JPanel mainPanel = new JPanel();
     JPanel buttonPanel = new JPanel();
     JLabel iconLabel = new JLabel();
 
     JLabel receivedBytesLabel = new JLabel();
+    JLabel receivedPacketsLabel = new JLabel();
+    JLabel lostPacketsFractionLabel = new JLabel();
     JLabel lostPacketsLabel = new JLabel();
     JLabel dateRateLabel = new JLabel();
     ImageIcon icon;
 
     //Helper classes
-    Statistic stats;
+    PacketBuffer packetBuffer;
 
 
     //RTP variables:
@@ -45,8 +50,9 @@ public class Client {
     private DatagramSocket rtpDatagramSocket; //socket to be used to send and receive UDP packets
     private static int RTP_RCV_PORT = 25000; //port where the client will receive the RTP packets
 
-    private Timer timer; //timer used to receive data from the UDP socket
-    private byte[] buf; //buffer used to store data received from the server
+    private Timer recrivePacketTimer; //recrivePacketTimer used to receive data from the UDP socket
+    private Timer updateLabelsTimer;
+    private byte[] buf; //fecBuffer used to store data received from the server
 
     //RTSP variables
     private final static String RTSP_VERSION = "RTSP/1.0";
@@ -56,6 +62,7 @@ public class Client {
     private final static int INIT = 0;
     private final static int READY = 1;
     private final static int PLAYING = 2;
+    private final static int OPTIONS = 3;
     private static int state; //RTSP state == INIT or READY or PLAYING
     private Socket rtspSocket; //socket used to send/receive RTSP messages
     //input and output stream filters
@@ -67,7 +74,6 @@ public class Client {
     int rtspId = 0; //ID of the RTSP session (given by the RTSP Server)
 
     final static String CRLF = "\r\n";
-
 
 
     //Video constants:
@@ -90,22 +96,29 @@ public class Client {
 
         //Buttons
         buttonPanel.setLayout(new GridLayout(1, 0));
+        buttonPanel.add(optButton);
         buttonPanel.add(setupButton);
         buttonPanel.add(playButton);
         buttonPanel.add(pauseButton);
         buttonPanel.add(tearButton);
-        setupButton.addActionListener(new setupButtonListener());
+        optButton.addActionListener(new OptionsButtonListener());
+        setupButton.addActionListener(new SetupButtonListener());
         playButton.addActionListener(new playButtonListener());
         pauseButton.addActionListener(new pauseButtonListener());
         tearButton.addActionListener(new tearButtonListener());
 
         //Statistics
-        receivedBytesLabel.setText(receivedBytes +"0");
+        receivedBytesLabel.setText(Texts.receivedBytes + "0");
+        receivedPacketsLabel.setText(Texts.receivedPacktes + "0");
         lostPacketsLabel.setText(Texts.lostPackets + "0");
+        lostPacketsFractionLabel.setText(Texts.lostPacketsFraction + "0");
         dateRateLabel.setText(Texts.dateRate + "0");
+
         mainPanel.add(receivedBytesLabel);
         mainPanel.add(lostPacketsLabel);
         mainPanel.add(dateRateLabel);
+        mainPanel.add(lostPacketsFractionLabel);
+        mainPanel.add(receivedPacketsLabel);
 
         //Image display label
         iconLabel.setIcon(null);
@@ -115,24 +128,29 @@ public class Client {
         mainPanel.add(iconLabel);
         mainPanel.add(buttonPanel);
 
-        receivedBytesLabel.setBounds(8,340,380,20);
-        lostPacketsLabel.setBounds(8,360,380,20);
-        dateRateLabel.setBounds(8,380,380,20);
+        receivedBytesLabel.setBounds(8, 340, 380, 20);
+        lostPacketsLabel.setBounds(8, 360, 380, 20);
+        dateRateLabel.setBounds(8, 380, 380, 20);
+        lostPacketsFractionLabel.setBounds(8, 400, 380, 20);
+        receivedPacketsLabel.setBounds(8, 420, 380, 20);
 
         iconLabel.setBounds(0, 0, 380, 280);
-        buttonPanel.setBounds(0, 280, 380, 50);
+        buttonPanel.setBounds(8, 280, 380, 50);
 
         f.getContentPane().add(mainPanel, BorderLayout.CENTER);
-        f.setSize(new Dimension(390, 440));
+        f.setSize(new Dimension(410, 480));
         f.setVisible(true);
 
-        //init timer
+        //init recrivePacketTimer
         //--------------------------
-        timer = new Timer(20, new timerListener());
-        timer.setInitialDelay(0);
-        timer.setCoalesce(true);
+        recrivePacketTimer = new Timer(20, new ReceivePacketListener());
+        updateLabelsTimer = new Timer(1000, e -> packetBuffer.updateStatsViewGui());
+        recrivePacketTimer.setInitialDelay(0);
+        updateLabelsTimer.setInitialDelay(0);
+        recrivePacketTimer.setCoalesce(true);
+        updateLabelsTimer.setCoalesce(true);
 
-        //allocate enough memory for the buffer used to receive data from the server
+        //allocate enough memory for the fecBuffer used to receive data from the server
         buf = new byte[15000];
     }
 
@@ -174,23 +192,38 @@ public class Client {
     //TO COMPLETE
     //.............
 
+    //Handler for Options button
+    //-----------------------
+    private class OptionsButtonListener implements ActionListener {
+        public void actionPerformed(ActionEvent e) {
+            System.out.println("Options Button pressed !");
+
+            if (state == INIT) {
+                //Init non-blocking rtpDatagramSocket that will be used to receive data
+                initDatagramSocket();
+
+                //init RTSP sequence number
+                rtspSeqNb = 1;
+                state = OPTIONS;
+                //Send SETUP message to the server
+                send_RTSP_request("OPTIONS");
+
+                //Wait for the response
+                if (parse_server_response() != 200)
+                    System.out.println("Invalid Server Response");
+            }
+        }
+    }
+
     //Handler for Setup button
     //-----------------------
-    private class setupButtonListener implements ActionListener {
+    private class SetupButtonListener implements ActionListener {
         public void actionPerformed(ActionEvent e) {
             System.out.println("Setup Button pressed !");
 
             if (state == INIT) {
                 //Init non-blocking rtpDatagramSocket that will be used to receive data
-                try {
-                    rtpDatagramSocket = new DatagramSocket(RTP_RCV_PORT);
-                    rtpDatagramSocket.setSoTimeout(5);
-                    //construct a new DatagramSocket to receive RTP packets from the server, on port RTP_RCV_PORT
-
-                } catch (SocketException se) {
-                    System.out.println("Socket exception: " + se);
-                    System.exit(0);
-                }
+                initDatagramSocket();
 
                 //init RTSP sequence number
                 rtspSeqNb = 1;
@@ -210,15 +243,26 @@ public class Client {
         }
     }
 
+    private void initDatagramSocket() {
+        try {
+            if (rtpDatagramSocket == null) {
+                rtpDatagramSocket = new DatagramSocket(RTP_RCV_PORT);
+                rtpDatagramSocket.setSoTimeout(5);
+            }
+
+        } catch (SocketException se) {
+            System.out.println("Socket exception: " + se);
+            System.exit(0);
+        }
+    }
+
     //Handler for Play button
     //-----------------------
     private class playButtonListener implements ActionListener {
         public void actionPerformed(ActionEvent e) {
 
             System.out.println("Play Button pressed !");
-            ;
-
-            stats = Statistic.start();
+            packetBuffer = new PacketBuffer(Statistic.start(),Client.this);
             if (state == READY) {
 
                 inkSeqNr();
@@ -232,10 +276,11 @@ public class Client {
                 else {
                     //change RTSP state and print out new state
                     state = PLAYING;
-                    System.out.println("New RTSP state: PLAYING" );
+                    System.out.println("New RTSP state: PLAYING");
 
-                    //start the timer
-                    timer.start();
+                    //start the recrivePacketTimer
+                    recrivePacketTimer.start();
+                    updateLabelsTimer.start();
                 }
             }
         }
@@ -264,8 +309,9 @@ public class Client {
                     state = READY;
                     System.out.println("New RTSP state: PAUSED");
 
-                    //stop the timer
-                    timer.stop();
+                    //stop the recrivePacketTimer
+                    recrivePacketTimer.stop();
+                    updateLabelsTimer.stop();
                 }
             }
         }
@@ -290,8 +336,9 @@ public class Client {
                 state = INIT;
                 System.out.println("New RTSP state: INIT");
 
-                //stop the timer
-                timer.stop();
+                //stop the recrivePacketTimer
+                recrivePacketTimer.stop();
+                updateLabelsTimer.stop();
 
                 //exit
                 System.exit(0);
@@ -301,11 +348,9 @@ public class Client {
 
 
     //------------------------------------
-    //Handler for timer
+    //Handler for recrivePacketTimer
     //------------------------------------
-
-    int statExpRtpNb;           //Expected Sequence number of RTP messages within the session
-    private class timerListener implements ActionListener {
+    private class ReceivePacketListener implements ActionListener {
         public void actionPerformed(ActionEvent e) {
 
             //Construct a DatagramPacket to receive data from the UDP socket
@@ -314,47 +359,25 @@ public class Client {
             try {
                 //receive the DP from the socket:
                 rtpDatagramSocket.receive(rcvdp);
-
-                //create an RTPpacket object from the DP
-                RTPpacket rtp_packet = new RTPpacket(rcvdp.getData(), rcvdp.getLength());
-                int seqNr = rtp_packet.getsequencenumber();
-
-                //print important header fields of the RTP packet received:
-                System.out.println("Got RTP packet with SeqNum # " + rtp_packet.getsequencenumber() + " TimeStamp " + rtp_packet.gettimestamp() + " ms, of type " + rtp_packet.getpayloadtype());
-
-                //print header bitstream:
-                rtp_packet.printheader();
-
-                //get the payload bitstream from the RTPpacket object
-                int payload_length = rtp_packet.getpayload_length();
-                byte[] payload = new byte[payload_length];
-                rtp_packet.getpayload(payload);
-
-                //STATISTIC
-                statExpRtpNb++;
-
-                if (seqNr > stats.getHighestSeqNr()) {
-                    stats.setHighestSeqNr(seqNr);
-                }
-                if (statExpRtpNb != seqNr) {
-                    stats.incrementPacketsLost();
-                }
-
-                stats.increaseTotalBytes(payload_length);
-                updateStatsGui();
-                //get an Image object from the payload bitstream
-                Toolkit toolkit = Toolkit.getDefaultToolkit();
-                Image image = toolkit.createImage(payload, 0, payload_length);
-
-                //display the image as an ImageIcon object
-                icon = new ImageIcon(image);
-                iconLabel.setIcon(icon);
+                packetBuffer.addPacket(rcvdp.getData(), rcvdp.getLength());
             } catch (InterruptedIOException iioe) {
                 //System.out.println("Nothing to read");
             } catch (IOException ioe) {
                 System.out.println("Exception caught: " + ioe);
             }
         }
+    }
+
+
+
+    public void setImage(byte[] payload) {
+        //get an Image object from the payload bitstream
+        Toolkit toolkit = Toolkit.getDefaultToolkit();
+        Image image = toolkit.createImage(payload);
+
+        //display the image as an ImageIcon object
+        icon = new ImageIcon(image);
+        iconLabel.setIcon(icon);
     }
 
     //------------------------------------
@@ -381,10 +404,14 @@ public class Client {
                 String SessionLine = rtspBufferedReader.readLine();
                 System.out.println(SessionLine);
 
-                //if state == INIT gets the Session Id from the SessionLine
-                tokens = new StringTokenizer(SessionLine);
-                tokens.nextToken(); //skip over the Session:
-                rtspId = Integer.parseInt(tokens.nextToken());
+                //if (state == INIT) gets the Session Id from the SessionLine
+                if (state != OPTIONS) {
+                    tokens = new StringTokenizer(SessionLine);
+                    tokens.nextToken(); //skip over the Session:
+                    rtspId = Integer.parseInt(tokens.nextToken());
+                } else {
+                    state = INIT;
+                }
             }
             System.out.println("-------------------------------");
         } catch (Exception ex) {
@@ -409,6 +436,8 @@ public class Client {
             rtspBufferedWriter.write(getSeqNrString() + CRLF);
             if ("SETUP".equalsIgnoreCase(request_type)) {
                 rtspBufferedWriter.write("Transport: RTP/UDP; client_port= " + RTP_RCV_PORT + CRLF);
+            } else if ("OPTIONS".equalsIgnoreCase(request_type)) {
+
             } else {
                 rtspBufferedWriter.write("Session: " + rtspId + CRLF);
             }
@@ -427,11 +456,13 @@ public class Client {
         return "CSeq: " + rtspSeqNb;
     }
 
-    private void updateStatsGui() {
-        DecimalFormat formatter = new DecimalFormat("###,###.##");
-        receivedBytesLabel.setText(Texts.receivedBytes + stats.getTotalBytes());
-        lostPacketsLabel.setText(Texts.lostPackets + formatter.format(stats.getPacketsLostFraction()));
-        dateRateLabel.setText(Texts.dateRate + formatter.format(stats.getDataRate()) );
+    public void updateStatsGui(int totalBytes, float packetsLostFraction, int lostPackets, double dataRate, int highestSeqNr) {
+        DecimalFormat formatter = new DecimalFormat("### , ###.##");
+        receivedBytesLabel.setText(Texts.receivedBytes + formatter.format(totalBytes));
+        lostPacketsFractionLabel.setText(Texts.lostPacketsFraction + formatter.format(packetsLostFraction));
+        lostPacketsLabel.setText(Texts.lostPackets + formatter.format(lostPackets));
+        dateRateLabel.setText(Texts.dateRate + formatter.format(dataRate));
+        receivedPacketsLabel.setText(Texts.receivedPacktes + formatter.format(highestSeqNr));
     }
 
 }//end of Class Client
