@@ -32,4 +32,12 @@ public abstract class Packet {
     //--------------------------
     abstract public int copyPacketBytesTo(byte[] packet);
 
+    //return the unsigned value of 8-bit integer nb
+    static int unsigned_int(int nb) {
+        if (nb >= 0)
+            return (nb);
+        else
+            return (256 + nb);
+    }
+
 }

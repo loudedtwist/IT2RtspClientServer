@@ -1,11 +1,28 @@
 package de.htwdresden.packets;
 
+import static de.htwdresden.packets.RtpPacket.HEADER_SIZE_RTP;
+
 public class FecPacket extends Packet {
     //header
     public static final int PAYLOAD_TYPE_FEC = 127;
     static final int HEADER_SIZE_FEC = 10;
     /*
         FEC HEADER
+
+        0                   1                   2                   3
+        0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       | K                             |            SN base            |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |                          TS recovery                          |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |        length recovery        |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       K - Anzahl der RTP Packeten im FEC Packet
+     */
+
+    /*
+        OUR FEC HEADER
 
         0                   1                   2                   3
         0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
@@ -69,6 +86,9 @@ public class FecPacket extends Packet {
     private byte[] fecHeader;
     public byte[] fecPayload;
 
+    int k;
+    int lastSeqNr;
+    int lastTimeStamp;
 
     /*
         Timestamp (TS): The timestamp MUST be set to the value of the media
@@ -81,6 +101,9 @@ public class FecPacket extends Packet {
         //this.SequenceNumber = rtpHeaderSeqNr;
 
         this.fecPayload = xoredPacket.payload;
+        this.k = k;
+        this.lastSeqNr = lastSeqNr;
+        this.lastTimeStamp = lastTimeStamp;
 
         this.rtpHeader = RtpPacket.getInitializedHeader(PAYLOAD_TYPE_FEC, lastSeqNr, lastTimeStamp);
 
@@ -92,11 +115,31 @@ public class FecPacket extends Packet {
                 xoredLengthOfAllEncodedPackets
         );
     }
+    public FecPacket(byte[] packet, int packet_size) {
+        //check if total packet size is lower than the header size
+        if (packet_size >= HEADER_SIZE_RTP + HEADER_SIZE_FEC) {
+            //get the rtpHeader bitsream:
+            rtpHeader = new byte[HEADER_SIZE_RTP];
+            System.arraycopy(packet, 0, rtpHeader, 0, HEADER_SIZE_RTP);
+
+            //get the fecHeader bitsream:
+            fecHeader = new byte[HEADER_SIZE_FEC];
+            System.arraycopy(packet, HEADER_SIZE_RTP, fecHeader, 0, HEADER_SIZE_FEC);
+
+            //get the payload bitstream:
+            int fecPayloadSize = packet_size - HEADER_SIZE_RTP - HEADER_SIZE_FEC;
+            fecPayload = new byte[fecPayloadSize];
+            System.arraycopy(packet, HEADER_SIZE_RTP + HEADER_SIZE_FEC, fecPayload, 0, packet_size - (HEADER_SIZE_RTP + HEADER_SIZE_FEC));
+
+            k = unsigned_int(fecHeader[1]) + 256 * unsigned_int(fecHeader[0]);
+            lastSeqNr = unsigned_int(fecHeader[3]) + 256 * unsigned_int(fecHeader[2]);
+        }
+    }
 
     private static byte[] getInitializedFecHeader(int k, int payloadType, int sequenceNumber, int timeStamp, int lengthOfAllEncodedPackets) {
         byte[] fecHeader = new byte[HEADER_SIZE_FEC];
-        fecHeader[0] = (byte) (k << 7 | LONG_MASK << 6 | PADDING << 5 | EXTENSION << 4 | CC);
-        fecHeader[1] = (byte) (MARKER << 7 | payloadType & 0x00FFFFFF);
+        fecHeader[0] = (byte) (k >> 8 );
+        fecHeader[1] = (byte) (k & 0xFF );
         fecHeader[2] = (byte) (sequenceNumber >> 8);
         fecHeader[3] = (byte) (sequenceNumber & 0xFF);
         fecHeader[4] = (byte) (timeStamp >> 24);

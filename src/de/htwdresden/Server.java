@@ -5,7 +5,7 @@ package de.htwdresden;
    ---------------------- */
 
 
-import de.htwdresden.packets.FecPacketBuffer;
+import de.htwdresden.packets.FecPacketNetworkManager;
 import de.htwdresden.packets.FecPacketsSender;
 import de.htwdresden.packets.Packet;
 import de.htwdresden.packets.RtpPacket;
@@ -30,7 +30,7 @@ public class Server extends JFrame  {
     //----------------
     DatagramSocket RTPsocket; //socket to be used to send and receive UDP packets
     DatagramPacket senddp; //UDP packet containing the video frames
-    FecPacketBuffer fecBuffer;
+    FecPacketNetworkManager fecBuffer;
 
     InetAddress ClientIPAddr; //Client IP address
     int RTP_dest_port = 0; //destination port for RTP packets  (given by the RTSP Client)
@@ -275,7 +275,7 @@ public class Server extends JFrame  {
                     RTP_dest_port = Integer.parseInt(tokens.nextToken());
                     //TODO FEC INIT
                     FecPacketsSender fecPacketSender = new FecPacketsSender(ClientIPAddr,RTP_dest_port);
-                    fecBuffer =  new FecPacketBuffer(fecPacketSender, 2);
+                    fecBuffer =  new FecPacketNetworkManager(fecPacketSender, 2);
                 }
 
             }

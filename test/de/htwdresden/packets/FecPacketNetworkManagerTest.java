@@ -6,9 +6,9 @@ import org.junit.Test;
 import java.net.InetAddress;
 
 
-public class FecPacketBufferTest {
+public class FecPacketNetworkManagerTest {
 
-    FecPacketBuffer buffer;
+    FecPacketNetworkManager buffer;
     IPacketsSender packetSender;
 
     @Before
@@ -17,7 +17,7 @@ public class FecPacketBufferTest {
         InetAddress ip = InetAddress.getLocalHost();
         packetSender = new FecPacketsSender(ip,25000);
         int k = 2;
-        buffer =  new FecPacketBuffer(packetSender, k);
+        buffer =  new FecPacketNetworkManager(packetSender, k);
         //buffer.addPacket(new RTPpacket(...));
         //buffer.addPacket(new RTPpacket(...));
         //weil k = 2 , soll buffer jetzt ein packet an den pcketsender senden, un der schickt es an den Klient.

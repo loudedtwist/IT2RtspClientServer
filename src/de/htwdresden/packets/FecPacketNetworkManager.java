@@ -6,12 +6,12 @@ import java.util.Stack;
  * After number of sent packets riches the k,
  * it sends a Fec packet with xored rtp packets stored previously.
  */
-public class FecPacketBuffer  {
+public class FecPacketNetworkManager {
     private IPacketsSender packetsSender = null;
     private Stack<RtpPacket> packets;
     private int k = 2;
 
-    public FecPacketBuffer(IPacketsSender packetsSender, int k){
+    public FecPacketNetworkManager(IPacketsSender packetsSender, int k){
         packets = new Stack<>();
         this.packetsSender = packetsSender;
         this.k = k;
