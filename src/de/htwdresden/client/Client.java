@@ -22,26 +22,26 @@ public class Client implements ClientView {
 
     //GUI
     //----
-    JFrame f = new JFrame("Client");
-    JButton optButton = new JButton("Options");
-    JButton setupButton = new JButton("Setup");
-    JButton playButton = new JButton("Play");
-    JButton pauseButton = new JButton("Pause");
-    JButton tearButton = new JButton("Teardown");
+    private JFrame f = new JFrame("Client");
+    private JButton optButton = new JButton("Options");
+    private JButton setupButton = new JButton("Setup");
+    private JButton playButton = new JButton("Play");
+    private JButton pauseButton = new JButton("Pause");
+    private JButton tearButton = new JButton("Teardown");
 
-    JPanel mainPanel = new JPanel();
-    JPanel buttonPanel = new JPanel();
-    JLabel iconLabel = new JLabel();
+    private JPanel mainPanel = new JPanel();
+    private JPanel buttonPanel = new JPanel();
+    private JLabel iconLabel = new JLabel();
 
-    JLabel receivedBytesLabel = new JLabel();
-    JLabel receivedPacketsLabel = new JLabel();
-    JLabel lostPacketsFractionLabel = new JLabel();
-    JLabel lostPacketsLabel = new JLabel();
-    JLabel dateRateLabel = new JLabel();
-    ImageIcon icon;
+    private JLabel receivedBytesLabel = new JLabel();
+    private JLabel receivedPacketsLabel = new JLabel();
+    private JLabel lostPacketsFractionLabel = new JLabel();
+    private JLabel lostPacketsLabel = new JLabel();
+    private JLabel dateRateLabel = new JLabel();
+    private ImageIcon icon;
 
     //Helper classes
-    PacketBuffer packetBuffer;
+    private PacketBuffer packetBuffer;
 
 
     //RTP variables:

@@ -1,4 +1,5 @@
 package de.htwdresden.packets;
+
 import java.util.Stack;
 
 /**
@@ -11,20 +12,23 @@ public class FecPacketNetworkManager {
     private Stack<RtpPacket> packets;
     private int k = 2;
 
-    public FecPacketNetworkManager(IPacketsSender packetsSender, int k){
+    public FecPacketNetworkManager(IPacketsSender packetsSender, int k) {
         packets = new Stack<>();
         this.packetsSender = packetsSender;
         this.k = k;
     }
 
-    public void addPacket(RtpPacket packet){
+    public void addPacket(RtpPacket packet) {
         packets.push(packet);
-        if(packets.size() % k == 0){
+        if (packets.size() % k == 0) {
             FecPacket newFacPacket = buildNewFecPacket();
             packetsSender.sendPacket(newFacPacket);
         }
     }
 
+    public void changeK(int k) {
+        if (k > 0) this.k = k;
+    }
     /*
     * The length recovery field is used to determine the length of any
    recovered packets.  It is computed via the protection operation
@@ -40,19 +44,19 @@ public class FecPacketNetworkManager {
    two media packets is 3 (0b011) and 5 (0b101) bytes, respectively.
    The length recovery field is then encoded as 0b011 xor 0b101 = 0b110. */
 
-    private FecPacket buildNewFecPacket(){
+    private FecPacket buildNewFecPacket() {
         RtpPacket packet = packets.pop();
         int xoredPayloadLength = packet.getPayloadLength();
-        int latestTimeStamp = 0 ;
+        int latestTimeStamp = 0;
         int latestSeqNr = 0;
 
-        for (int i=0;i<k-1; i++) {
+        for (int i = 0; i < k - 1; i++) {
             RtpPacket p = packets.pop();
             xoredPayloadLength ^= p.getPayloadLength();
             packet.xor(p);
             latestSeqNr = packet.SequenceNumber;
             latestTimeStamp = packet.getTimeStamp();
         }
-        return new FecPacket(packet,k,latestSeqNr,latestTimeStamp,xoredPayloadLength);
+        return new FecPacket(packet, k, latestSeqNr, latestTimeStamp, xoredPayloadLength);
     }
 }

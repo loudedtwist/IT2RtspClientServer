@@ -7,6 +7,13 @@ import java.net.InetAddress;
 
 
 public class FecPacketNetworkManagerTest {
+    @Test
+    public void toStringTest() throws Exception {
+        FecPacket f = new FecPacket(new byte[1000],1000);
+        f.k=4;
+        f.lastSeqNr=8;
+        System.out.println(f);
+    }
 
     FecPacketNetworkManager buffer;
     IPacketsSender packetSender;

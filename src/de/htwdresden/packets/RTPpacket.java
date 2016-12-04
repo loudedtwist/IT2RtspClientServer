@@ -1,4 +1,5 @@
 package de.htwdresden.packets;
+
 import de.htwdresden.Utils.Bytes;
 
 import java.util.Arrays;
@@ -33,7 +34,7 @@ public class RtpPacket extends Packet {
     //size of the RTP payload
     int payload_size;
 
-    public RtpPacket( byte[] header, byte[] payload){
+    public RtpPacket(byte[] header, byte[] payload) {
         //interpret the changing fields of the header:
         PayloadType = getPayloadTypeFromHeader();
         SequenceNumber = getSeqNummerFromHeader();
@@ -42,6 +43,7 @@ public class RtpPacket extends Packet {
         this.payload = payload;
         this.payload_size = payload.length;
     }
+
     //--------------------------
     //Constructor of an RTPpacket object from header fields and payload bitstream
     //FEC PType -> 127
@@ -151,7 +153,6 @@ public class RtpPacket extends Packet {
     }
 
 
-
     //--------------------------
     //getTimeStamp
     //--------------------------
@@ -190,13 +191,7 @@ public class RtpPacket extends Packet {
         System.out.println();
     }
 
-    //return the unsigned value of 8-bit integer nb
-    static int unsigned_int(int nb) {
-        if (nb >= 0)
-            return (nb);
-        else
-            return (256 + nb);
-    }
+
     //--------------------------
     //copyPacketBytesTo: returns the packet bit stream and its length
     //--------------------------
@@ -219,7 +214,6 @@ public class RtpPacket extends Packet {
     }
 
 
-
     //--------------------------
     //getLength: return the total length of the RTP packet
     //--------------------------
@@ -232,12 +226,30 @@ public class RtpPacket extends Packet {
         byte[] newHeader = Bytes.xor(p1.header, p2.header);
         byte[] newPaload = Bytes.xor(p1.payload, p2.payload);
 
-        return new RtpPacket(newHeader,newPaload);
+        return new RtpPacket(newHeader, newPaload);
     }
+
     //xor to packets, the function takes the length of the biggest array . Remaining fields will be filled with 0
     public void xor(RtpPacket p2) {
         this.header = Bytes.xor(this.header, p2.header);
-        this.payload= Bytes.xor(this.payload, p2.payload);
+        this.payload = Bytes.xor(this.payload, p2.payload);
+    }
+    //xor to packets, the function takes the length of the biggest array . Remaining fields will be filled with 0
+    public void xorPayload(RtpPacket p2) {
+        this.payload = Bytes.xor(this.payload, p2.payload);
+    }
+    @Override
+    public String toString() {
+        String output = super.toString();
+        output += "Got RTP packet with SeqNum # " + getsequencenumber() + " TimeStamp " + getTimeStamp() + " ms, of type " + getPayloadType() + "\n";
+        return output;
     }
 
+    public void printPacket() {
+        //print important header fields of the RTP packet received:
+        System.out.printf(toString());
+        //print header bitstream:
+        printheader();
+        System.out.println("");
+    }
 }

@@ -78,6 +78,18 @@ public class Statistic {
         lastTimePoint = curTime;
     }
 
+    public void updateHighestNr(int seqNr) {
+        if (seqNr > getHighestSeqNr()) {
+            setHighestSeqNr(seqNr);
+        }
+    }
+
+    public void updateLostPacketsCounter(int seqNr, int expectedPacketIndex) {
+        if (expectedPacketIndex != seqNr) {
+            incrementPacketsLost();
+        }
+    }
+
     private class TimerUpdateTask extends TimerTask {
         @Override
         public void run() {

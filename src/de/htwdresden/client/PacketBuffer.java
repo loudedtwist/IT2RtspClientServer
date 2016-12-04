@@ -2,12 +2,11 @@ package de.htwdresden.client;
 
 import com.sun.istack.internal.NotNull;
 import de.htwdresden.Statistic;
+import de.htwdresden.Utils.Bytes;
 import de.htwdresden.packets.FecPacket;
 import de.htwdresden.packets.RtpPacket;
 
-import java.util.Stack;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.util.*;
 
 public class PacketBuffer {
 
@@ -17,8 +16,9 @@ public class PacketBuffer {
     private int receivedPackets = 0;
     private int expectedPacketIndex = 0;        //Expected Sequence number of RTP messages within the session
 
-    Stack<RtpPacket> fecPackets;
-    Stack<FecPacket> rtpPackets;
+    private List<FecPacket> fecPackets;
+    private Queue<RtpPacket> rtpPackets;
+    private List<RtpPacket> rtpPacketBuffer;
 
     private Timer timer;
     private boolean firstPacket = true;
@@ -26,8 +26,9 @@ public class PacketBuffer {
     public PacketBuffer(@NotNull Statistic stats, ClientView view) {
         this.stats = stats;
         this.view = view;
-        fecPackets = new Stack<>();
-        rtpPackets = new Stack<>();
+        fecPackets = new ArrayList<>();
+        rtpPackets = new ArrayDeque<>();
+        rtpPacketBuffer = new ArrayList<>();
         timer = new Timer();
     }
 
@@ -39,49 +40,110 @@ public class PacketBuffer {
         int pt = rtpPacket.getPayloadType();
         if (pt == RtpPacket.MJPEG_TYPE) {
             rtpPackets.add(rtpPacket);
+            rtpPacketBuffer.add(rtpPacket);
+        } else if (pt == FecPacket.PAYLOAD_TYPE_FEC) {
+            FecPacket fecPacket = new FecPacket(data, length);
+            fecPackets.add(fecPacket);
+            //System.out.println(fecPacket);
         }
-        else if( pt == FecPacket.PAYLOAD_TYPE_FEC){
-            fecPackets.add(rtpPacket);
-        }
-
         receivedPackets++;
     }
 
     private void startPlayAtFirstPacket() {
         if (firstPacket) {
             firstPacket = false;
-            timer.scheduleAtFixedRate(new DrawImageTimer(), 2000, 40);
+            timer.scheduleAtFixedRate(new DrawImageTimer(), 2000, 500);//40
         }
     }
 
     private void drawPacket(RtpPacket rtpPacket) {
-
+        if (rtpPacket == null) return;
         expectedPacketIndex++;
+        //rtpPacket.printPacket();
         int seqNr = rtpPacket.getsequencenumber();
 
-        //print important header fields of the RTP packet received:
-        System.out.println("Got RTP packet with SeqNum # " + rtpPacket.getsequencenumber() + " TimeStamp " + rtpPacket.getTimeStamp() + " ms, of type " + rtpPacket.getPayloadType());
-
-        //print header bitstream:
-        rtpPacket.printheader();
-
-        //get the payload bitstream from the RTPpacket object
-        int payload_length = rtpPacket.getPayloadLength();
-        byte[] payload = new byte[payload_length];
-        rtpPacket.getPayload(payload);
 
         //STATISTIC
+        stats.updateHighestNr(seqNr);
+        stats.updateLostPacketsCounter(seqNr, expectedPacketIndex);
 
-        if (seqNr > stats.getHighestSeqNr()) {
-            stats.setHighestSeqNr(seqNr);
-        }
-        if (expectedPacketIndex != seqNr) {
-            stats.incrementPacketsLost();
-            expectedPacketIndex = seqNr;
-        }
-        stats.increaseTotalBytes(payload_length);
+        byte[] payload;
+        int payloadLength;
+        if (expectedPacketIndex == seqNr) {
+            erasePacketFromQueue();
+            //get the payload bitStream from the RtpPacket object
+            payloadLength = rtpPacket.getPayloadLength();
+            payload = new byte[payloadLength];
+            rtpPacket.getPayload(payload);
+            System.out.println("Playing Seq: " + seqNr + "(O) OK");
+        } else {
+            FecPacket fecWithLostPacket = findFec(expectedPacketIndex);
+            if (fecWithLostPacket == null) {
+                System.out.println("");
+                System.out.println("Fec packet for the lost packet has not been found.");
+                System.out.println("Playing Seq: " + expectedPacketIndex + "(X) LOST AND NOT FOUND");
+                System.out.println("");
+                return;
+            }
+            byte[] lostPayload = getPayloadFromFec(fecWithLostPacket, expectedPacketIndex);
+            if (lostPayload == null) {
+                System.out.println("");
+                System.out.println("Playing Seq: " + expectedPacketIndex + "(X) LOST AND NOT FOUND");
+                System.out.println("There are not enough packets to restore lost packet from FEC");
+                System.out.println(fecWithLostPacket);
+                return;
+            }
+            System.out.println("");
+            System.out.println("Playing Seq: " + expectedPacketIndex + "(R) LOST AND HAS BEEN FOUND IN FEC AND RECOVERED");
+            System.out.println(fecWithLostPacket);
 
+            payload = lostPayload;
+            payloadLength = lostPayload.length;
+        }
+
+        stats.increaseTotalBytes(payloadLength);
         view.setImage(payload);
+    }
+
+
+    private void erasePacketFromQueue() {
+        rtpPackets.poll();
+    }
+
+    private byte[] getPayloadFromFec(FecPacket p, int lostSeqNr) {
+        byte[] result = new byte[0];
+        for (int i = p.lastSeqNr - p.k + 1; i <= p.lastSeqNr; i++) {
+            if (i != lostSeqNr) {
+                RtpPacket otherP = getRtpPacketFromBuffer(i);
+                //if one of packet, that we need to decode the packet, had not been found
+                //we cant decode packet we are looking for, so return null
+                if (otherP == null) return null;
+                byte[] pl1 = new byte[otherP.getPayloadLength()];
+                otherP.getPayload(pl1);
+                result = Bytes.xor(pl1, result);
+            }
+        }
+        if (result.length != 0) {
+            return Bytes.xor(p.fecPayload, result);
+        } else {
+            return null;
+        }
+    }
+
+    private FecPacket findFec(int lostSeqNr) {
+        for (FecPacket p : fecPackets) {
+            if (lostSeqNr <= p.lastSeqNr && lostSeqNr > p.lastSeqNr - p.k) {
+                return p;
+            }
+        }
+        return null;
+    }
+
+    private RtpPacket getRtpPacketFromBuffer(int seqNr) {
+        for (RtpPacket p : rtpPacketBuffer) {
+            if (p.getsequencenumber() == seqNr) return p;
+        }
+        return null;
     }
 
     public void updateStatsViewGui() {
@@ -98,8 +160,7 @@ public class PacketBuffer {
     private class DrawImageTimer extends TimerTask {
         @Override
         public void run() {
-            if (rtpPackets.size() == 0) return;
-            RtpPacket rtpPacket = rtpPackets.remove(0);
+            RtpPacket rtpPacket = rtpPackets.peek();
             drawPacket(rtpPacket);
         }
     }

@@ -24,7 +24,7 @@ import java.net.*;
 import java.util.Random;
 import java.util.StringTokenizer;
 
-public class Server extends JFrame  {
+public class Server extends JFrame {
 
     //RTP variables:
     //----------------
@@ -82,6 +82,7 @@ public class Server extends JFrame  {
 
     private JSlider dropRateSlider;
     private JSlider packetsForOneFecCodePacketSlider;
+
     //--------------------------------
     //Constructor
     //--------------------------------
@@ -112,9 +113,12 @@ public class Server extends JFrame  {
         label = new JLabel("Send frame #        ", JLabel.CENTER);
         dropRateSlider = new JSlider(JSlider.HORIZONTAL, 0, 50, 25);
         packetsForOneFecCodePacketSlider = new JSlider(JSlider.HORIZONTAL, 0, 50, 25);
-        dropRateSlider.addChangeListener(e -> onTimerListener.setSkipRate(dropRateSlider.getValue()/100.0f));
-        initSlider(dropRateSlider,0,100,10,0);
-        initSlider(packetsForOneFecCodePacketSlider,2,20,2,2);
+        packetsForOneFecCodePacketSlider.addChangeListener(e -> {
+            if (fecBuffer != null) fecBuffer.changeK(dropRateSlider.getValue());
+        });
+        dropRateSlider.addChangeListener(e -> onTimerListener.setSkipRate(dropRateSlider.getValue() / 100.0f));
+        initSlider(dropRateSlider, 0, 100, 10, 0);
+        initSlider(packetsForOneFecCodePacketSlider, 2, 20, 2, 2);
         getContentPane().add(label, BorderLayout.NORTH);
         getContentPane().add(dropRateSlider, BorderLayout.CENTER);
         getContentPane().add(packetsForOneFecCodePacketSlider, BorderLayout.SOUTH);
@@ -274,8 +278,8 @@ public class Server extends JFrame  {
                         tokens.nextToken(); //skip unused stuff
                     RTP_dest_port = Integer.parseInt(tokens.nextToken());
                     //TODO FEC INIT
-                    FecPacketsSender fecPacketSender = new FecPacketsSender(ClientIPAddr,RTP_dest_port);
-                    fecBuffer =  new FecPacketNetworkManager(fecPacketSender, 2);
+                    FecPacketsSender fecPacketSender = new FecPacketsSender(ClientIPAddr, RTP_dest_port);
+                    fecBuffer = new FecPacketNetworkManager(fecPacketSender, packetsForOneFecCodePacketSlider.getValue());
                 }
 
             }
@@ -313,8 +317,8 @@ public class Server extends JFrame  {
         Random random = new Random();
         private float skipRatePercent = 0;
 
-        public void setSkipRate(float percent){
-            System.out.println("New Percentege "+percent);
+        public void setSkipRate(float percent) {
+            System.out.println("New Percentege " + percent);
             this.skipRatePercent = percent;
         }
 
@@ -333,7 +337,6 @@ public class Server extends JFrame  {
                     RtpPacket rtp_packet = new RtpPacket(Packet.MJPEG_TYPE, imageNr, imageNr * FRAME_PERIOD, buf, image_length);
 
 
-
                     //get to total length of the full rtp packet to send
                     int packet_length = rtp_packet.getLength();
 
@@ -347,10 +350,10 @@ public class Server extends JFrame  {
                     //TODO ADD PACKET TO FEC BUFFER
                     fecBuffer.addPacket(rtp_packet);
 
-                    if(random.nextFloat() >= skipRatePercent)
+                    if (random.nextFloat() >= skipRatePercent)
                         RTPsocket.send(senddp);
 
-                    System.out.println("Send frame #"+ imageNr);
+                    System.out.println("Send frame #" + imageNr);
                     //print the header bitstream
                     rtp_packet.printheader();
 

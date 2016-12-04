@@ -74,6 +74,10 @@ public class FecPacket extends Packet {
       len. rec.: 372   [200 XOR 140 XOR 100 XOR 340]
 
      */
+    //RTP HEADER - payload = 127, lastSeq = ...
+    //FEC HEADER - Kx xored RTP HEADER or simpler [2Bytes K]
+    //XORED PAYLOAD - from Kx xored rtp packets
+
     private static final int LONG_MASK = 0;
 
     //The P recovery field, the X recovery field, the CC recovery field,
@@ -86,8 +90,8 @@ public class FecPacket extends Packet {
     private byte[] fecHeader;
     public byte[] fecPayload;
 
-    int k;
-    int lastSeqNr;
+    public int k;
+    public int lastSeqNr;
     int lastTimeStamp;
 
     /*
@@ -107,6 +111,9 @@ public class FecPacket extends Packet {
 
         this.rtpHeader = RtpPacket.getInitializedHeader(PAYLOAD_TYPE_FEC, lastSeqNr, lastTimeStamp);
 
+        RtpPacket p = new RtpPacket(rtpHeader, rtpHeader.length);
+        int pt = p.getPayloadTypeFromHeader();
+
         this.fecHeader = FecPacket.getInitializedFecHeader(
                 k,
                 xoredPacket.getPayloadTypeFromHeader(),
@@ -115,6 +122,7 @@ public class FecPacket extends Packet {
                 xoredLengthOfAllEncodedPackets
         );
     }
+
     public FecPacket(byte[] packet, int packet_size) {
         //check if total packet size is lower than the header size
         if (packet_size >= HEADER_SIZE_RTP + HEADER_SIZE_FEC) {
@@ -138,8 +146,8 @@ public class FecPacket extends Packet {
 
     private static byte[] getInitializedFecHeader(int k, int payloadType, int sequenceNumber, int timeStamp, int lengthOfAllEncodedPackets) {
         byte[] fecHeader = new byte[HEADER_SIZE_FEC];
-        fecHeader[0] = (byte) (k >> 8 );
-        fecHeader[1] = (byte) (k & 0xFF );
+        fecHeader[0] = (byte) (k >> 8);
+        fecHeader[1] = (byte) (k & 0xFF);
         fecHeader[2] = (byte) (sequenceNumber >> 8);
         fecHeader[3] = (byte) (sequenceNumber & 0xFF);
         fecHeader[4] = (byte) (timeStamp >> 24);
@@ -158,6 +166,19 @@ public class FecPacket extends Packet {
 
     @Override
     public int copyPacketBytesTo(byte[] packet) {
-        return 0;
+        System.arraycopy(rtpHeader, 0, packet, 0, HEADER_SIZE_RTP);
+        System.arraycopy(fecHeader, 0, packet, HEADER_SIZE_RTP, HEADER_SIZE_FEC);
+        System.arraycopy(fecPayload, 0, packet, HEADER_SIZE_RTP + HEADER_SIZE_FEC, fecPayload.length);
+        return HEADER_SIZE_RTP + HEADER_SIZE_FEC + fecPayload.length;
+    }
+
+
+    @Override
+    public String toString() {
+        String output = super.toString() + "\n";
+        output += "     FEC PACKET" + "\n";
+        output += "     K:" + k + "\n";
+        output += "     LastSeqNr: " + lastSeqNr + "\n";
+        return output;
     }
 }
