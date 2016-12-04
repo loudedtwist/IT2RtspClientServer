@@ -52,7 +52,7 @@ public class PacketBuffer {
     private void startPlayAtFirstPacket() {
         if (firstPacket) {
             firstPacket = false;
-            timer.scheduleAtFixedRate(new DrawImageTimer(), 2000, 500);//40
+            timer.scheduleAtFixedRate(new DrawImageTimer(), 2000, 40);//40
         }
     }
 
@@ -112,7 +112,7 @@ public class PacketBuffer {
 
     private byte[] getPayloadFromFec(FecPacket p, int lostSeqNr) {
         byte[] result = new byte[0];
-        for (int i = p.lastSeqNr - p.k + 1; i <= p.lastSeqNr; i++) {
+        for (int i = p.firstSeqNr(); i <= p.lastSeqNr; i++) {
             if (i != lostSeqNr) {
                 RtpPacket otherP = getRtpPacketFromBuffer(i);
                 //if one of packet, that we need to decode the packet, had not been found
@@ -131,8 +131,13 @@ public class PacketBuffer {
     }
 
     private FecPacket findFec(int lostSeqNr) {
-        for (FecPacket p : fecPackets) {
-            if (lostSeqNr <= p.lastSeqNr && lostSeqNr > p.lastSeqNr - p.k) {
+
+        for (Iterator<FecPacket> it = fecPackets.iterator(); it.hasNext(); ) {
+            FecPacket p = it.next();
+            if( lostSeqNr > p.lastSeqNr) {
+                it.remove();
+            }
+            if (lostSeqNr <= p.lastSeqNr && lostSeqNr >= p.firstSeqNr()) {
                 return p;
             }
         }
@@ -140,7 +145,8 @@ public class PacketBuffer {
     }
 
     private RtpPacket getRtpPacketFromBuffer(int seqNr) {
-        for (RtpPacket p : rtpPacketBuffer) {
+        for (Iterator<RtpPacket> it = rtpPackets.iterator(); it.hasNext(); ) {
+            RtpPacket p = it.next();
             if (p.getsequencenumber() == seqNr) return p;
         }
         return null;

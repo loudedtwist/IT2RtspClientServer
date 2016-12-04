@@ -172,6 +172,9 @@ public class FecPacket extends Packet {
         return HEADER_SIZE_RTP + HEADER_SIZE_FEC + fecPayload.length;
     }
 
+    public int firstSeqNr() {
+        return lastSeqNr - k + 1;
+    }
 
     @Override
     public String toString() {
