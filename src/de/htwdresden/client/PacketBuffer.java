@@ -1,7 +1,6 @@
 package de.htwdresden.client;
 
 import com.sun.istack.internal.NotNull;
-import de.htwdresden.Statistic;
 import de.htwdresden.Utils.Bytes;
 import de.htwdresden.packets.FecPacket;
 import de.htwdresden.packets.RtpPacket;
@@ -13,12 +12,11 @@ public class PacketBuffer {
 
     private Statistic stats;
     private ClientView view;
-    private int receivedPackets = 0;
+    private VideoPlayer player;
     private int expectedPacketIndex = 0;        //Expected Sequence number of RTP messages within the session
 
     private List<FecPacket> fecPackets;
     private Queue<RtpPacket> rtpPackets;
-    private List<RtpPacket> rtpPacketBuffer;
 
     private Timer timer;
     private boolean firstPacket = true;
@@ -26,9 +24,9 @@ public class PacketBuffer {
     public PacketBuffer(@NotNull Statistic stats, ClientView view) {
         this.stats = stats;
         this.view = view;
+        player = new VideoPlayer(view);
         fecPackets = new ArrayList<>();
         rtpPackets = new ArrayDeque<>();
-        rtpPacketBuffer = new ArrayList<>();
         timer = new Timer();
     }
 
@@ -40,26 +38,33 @@ public class PacketBuffer {
         int pt = rtpPacket.getPayloadType();
         if (pt == RtpPacket.MJPEG_TYPE) {
             rtpPackets.add(rtpPacket);
-            rtpPacketBuffer.add(rtpPacket);
         } else if (pt == FecPacket.PAYLOAD_TYPE_FEC) {
             FecPacket fecPacket = new FecPacket(data, length);
             fecPackets.add(fecPacket);
-            //System.out.println(fecPacket);
         }
-        receivedPackets++;
+        stats.increaseTotalBytes(length);
     }
 
     private void startPlayAtFirstPacket() {
         if (firstPacket) {
             firstPacket = false;
-            timer.scheduleAtFixedRate(new DrawImageTimer(), 2000, 40);//40
+            int fps = 25;
+            player.play(fps, 2000);
+            timer.scheduleAtFixedRate(new FillVideoPlayerQueueTimer(), 2000, 1000 / (fps * 2));//40
         }
     }
 
-    private void drawPacket(RtpPacket rtpPacket) {
+    private class FillVideoPlayerQueueTimer extends TimerTask {
+        @Override
+        public void run() {
+            RtpPacket rtpPacket = rtpPackets.peek();
+            findNextImageForVideoPlayer(rtpPacket);
+        }
+    }
+
+    private void findNextImageForVideoPlayer(RtpPacket rtpPacket) {
         if (rtpPacket == null) return;
         expectedPacketIndex++;
-        //rtpPacket.printPacket();
         int seqNr = rtpPacket.getsequencenumber();
 
 
@@ -68,41 +73,26 @@ public class PacketBuffer {
         stats.updateLostPacketsCounter(seqNr, expectedPacketIndex);
 
         byte[] payload;
-        int payloadLength;
+
         if (expectedPacketIndex == seqNr) {
             erasePacketFromQueue();
-            //get the payload bitStream from the RtpPacket object
-            payloadLength = rtpPacket.getPayloadLength();
-            payload = new byte[payloadLength];
-            rtpPacket.getPayload(payload);
-            System.out.println("Playing Seq: " + seqNr + "(O) OK");
+            payload = rtpPacket.getPayloadCopy();
+            BufferTerminalOutput.RtpFound(seqNr);
         } else {
             FecPacket fecWithLostPacket = findFec(expectedPacketIndex);
             if (fecWithLostPacket == null) {
-                System.out.println("");
-                System.out.println("Fec packet for the lost packet has not been found.");
-                System.out.println("Playing Seq: " + expectedPacketIndex + "(X) LOST AND NOT FOUND");
-                System.out.println("");
+                BufferTerminalOutput.LostNotFound(expectedPacketIndex);
                 return;
             }
             byte[] lostPayload = getPayloadFromFec(fecWithLostPacket, expectedPacketIndex);
             if (lostPayload == null) {
-                System.out.println("");
-                System.out.println("Playing Seq: " + expectedPacketIndex + "(X) LOST AND NOT FOUND");
-                System.out.println("There are not enough packets to restore lost packet from FEC");
-                System.out.println(fecWithLostPacket);
+                BufferTerminalOutput.LostFoundCantRecover(expectedPacketIndex,fecWithLostPacket);
                 return;
             }
-            System.out.println("");
-            System.out.println("Playing Seq: " + expectedPacketIndex + "(R) LOST AND HAS BEEN FOUND IN FEC AND RECOVERED");
-            System.out.println(fecWithLostPacket);
-
+            BufferTerminalOutput.LostFoundRecovered(expectedPacketIndex,fecWithLostPacket);
             payload = lostPayload;
-            payloadLength = lostPayload.length;
         }
-
-        stats.increaseTotalBytes(payloadLength);
-        view.setImage(payload);
+        player.insertImage(payload);
     }
 
 
@@ -131,10 +121,9 @@ public class PacketBuffer {
     }
 
     private FecPacket findFec(int lostSeqNr) {
-
         for (Iterator<FecPacket> it = fecPackets.iterator(); it.hasNext(); ) {
             FecPacket p = it.next();
-            if( lostSeqNr > p.lastSeqNr) {
+            if (lostSeqNr > p.lastSeqNr) {
                 it.remove();
             }
             if (lostSeqNr <= p.lastSeqNr && lostSeqNr >= p.firstSeqNr()) {
@@ -162,12 +151,5 @@ public class PacketBuffer {
                 stats.getHighestSeqNr()
         );
     }
-
-    private class DrawImageTimer extends TimerTask {
-        @Override
-        public void run() {
-            RtpPacket rtpPacket = rtpPackets.peek();
-            drawPacket(rtpPacket);
-        }
-    }
 }
+

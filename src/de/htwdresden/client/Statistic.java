@@ -1,4 +1,4 @@
-package de.htwdresden;
+package de.htwdresden.client;
 
 import java.util.Timer;
 import java.util.TimerTask;

@@ -152,6 +152,16 @@ public class RtpPacket extends Packet {
         return payload_size;
     }
 
+    //--------------------------
+    //getPayload: return the payload bistream of the RTPpacket and its size
+    //--------------------------
+    public byte[] getPayloadCopy() {
+        byte[] copy = new byte[payload_size];
+        getPayload(copy);
+        return copy;
+    }
+
+
 
     //--------------------------
     //getTimeStamp

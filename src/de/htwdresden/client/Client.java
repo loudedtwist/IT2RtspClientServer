@@ -4,7 +4,6 @@ package de.htwdresden.client;
    usage: java Client [Server hostname] [Server RTSP listening port] [Video file requested]
    ---------------------- */
 
-import de.htwdresden.Statistic;
 import de.htwdresden.Texts;
 
 import javax.swing.*;
@@ -25,7 +24,7 @@ public class Client implements ClientView {
     private JFrame f = new JFrame("Client");
     private JButton optButton = new JButton("Options");
     private JButton setupButton = new JButton("Setup");
-    private JButton playButton = new JButton("Play");
+    private JButton playButton = new JButton("play");
     private JButton pauseButton = new JButton("Pause");
     private JButton tearButton = new JButton("Teardown");
 
@@ -256,12 +255,12 @@ public class Client implements ClientView {
         }
     }
 
-    //Handler for Play button
+    //Handler for play button
     //-----------------------
     private class playButtonListener implements ActionListener {
         public void actionPerformed(ActionEvent e) {
 
-            System.out.println("Play Button pressed !");
+            System.out.println("play Button pressed !");
             packetBuffer = new PacketBuffer(Statistic.start(),Client.this);
             if (state == READY) {
 
