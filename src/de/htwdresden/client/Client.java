@@ -41,6 +41,7 @@ public class Client implements ClientView {
 
     //Helper classes
     private PacketBuffer packetBuffer;
+    private Statistic stats;
 
 
     //RTP variables:
@@ -143,7 +144,7 @@ public class Client implements ClientView {
         //init recrivePacketTimer
         //--------------------------
         recrivePacketTimer = new Timer(20, new ReceivePacketListener());
-        updateLabelsTimer = new Timer(1000, e -> packetBuffer.updateStatsViewGui());
+        updateLabelsTimer = new Timer(1000, e -> updateStatsViewGui());
         recrivePacketTimer.setInitialDelay(0);
         updateLabelsTimer.setInitialDelay(0);
         recrivePacketTimer.setCoalesce(true);
@@ -261,7 +262,8 @@ public class Client implements ClientView {
         public void actionPerformed(ActionEvent e) {
 
             System.out.println("play Button pressed !");
-            packetBuffer = new PacketBuffer(Statistic.start(),Client.this);
+            stats = Statistic.start();
+            packetBuffer = new PacketBuffer(stats, new VideoPlayer(Client.this));
             if (state == READY) {
 
                 inkSeqNr();
@@ -462,6 +464,17 @@ public class Client implements ClientView {
         lostPacketsLabel.setText(Texts.lostPackets + formatter.format(lostPackets));
         dateRateLabel.setText(Texts.dateRate + formatter.format(dataRate));
         receivedPacketsLabel.setText(Texts.receivedPacktes + formatter.format(highestSeqNr));
+    }
+
+    public void updateStatsViewGui() {
+        if (stats == null) return;
+        updateStatsGui(
+                stats.getTotalBytes(),
+                stats.getPacketsLostFraction(),
+                stats.getLostPackets(),
+                stats.getDataRate(),
+                stats.getHighestSeqNr()
+        );
     }
 
 }//end of Class Client

@@ -1,17 +1,27 @@
 package de.htwdresden.client;
 
 import com.sun.istack.internal.NotNull;
+import de.htwdresden.Texts;
 import de.htwdresden.Utils.Bytes;
 import de.htwdresden.packets.FecPacket;
 import de.htwdresden.packets.RtpPacket;
 
 import java.util.*;
 
+/**
+ * PacketBuffer takes packets(in bytes) from the client and stores it in it's buffer.
+ * It's parse and stores RTP and FEC packets differently in Queue(RTP) and List(FEC).
+ * After first packet has been stored it starts VideoPlayer and FillVideoPlayerQueueTimer.
+ * FillVideoPlayerQueueTimer is started at double of speed of VideoPlayer. It takes
+ * Packets saved from PacketBuffer, parses it sequentially and saves Frames stored in RTP Packets
+ * in the VideoPlayer. If one of the packets missing PacketBuffer try to find it in FEC Packets.
+ * If it find one, it stores in VideoPlayer the right one packet, elsewise it stores the next one.
+ * This class also updates statistic data and provides data for VideoPlayer,
+ * which is passed as dependency in the constructor and could be controlled by client.
+ */
 public class PacketBuffer {
 
-
     private Statistic stats;
-    private ClientView view;
     private VideoPlayer player;
     private int expectedPacketIndex = 0;        //Expected Sequence number of RTP messages within the session
 
@@ -21,10 +31,9 @@ public class PacketBuffer {
     private Timer timer;
     private boolean firstPacket = true;
 
-    public PacketBuffer(@NotNull Statistic stats, ClientView view) {
+    public PacketBuffer(@NotNull Statistic stats, VideoPlayer videoPlayer) {
         this.stats = stats;
-        this.view = view;
-        player = new VideoPlayer(view);
+        player = videoPlayer;
         fecPackets = new ArrayList<>();
         rtpPackets = new ArrayDeque<>();
         timer = new Timer();
@@ -77,19 +86,19 @@ public class PacketBuffer {
         if (expectedPacketIndex == seqNr) {
             erasePacketFromQueue();
             payload = rtpPacket.getPayloadCopy();
-            BufferTerminalOutput.RtpFound(seqNr);
+            Texts.BufferTerminalOutput.RtpFound(seqNr);
         } else {
             FecPacket fecWithLostPacket = findFec(expectedPacketIndex);
             if (fecWithLostPacket == null) {
-                BufferTerminalOutput.LostNotFound(expectedPacketIndex);
+                Texts.BufferTerminalOutput.LostNotFound(expectedPacketIndex);
                 return;
             }
             byte[] lostPayload = getPayloadFromFec(fecWithLostPacket, expectedPacketIndex);
             if (lostPayload == null) {
-                BufferTerminalOutput.LostFoundCantRecover(expectedPacketIndex,fecWithLostPacket);
+                Texts.BufferTerminalOutput.LostFoundCantRecover(expectedPacketIndex,fecWithLostPacket);
                 return;
             }
-            BufferTerminalOutput.LostFoundRecovered(expectedPacketIndex,fecWithLostPacket);
+            Texts.BufferTerminalOutput.LostFoundRecovered(expectedPacketIndex,fecWithLostPacket);
             payload = lostPayload;
         }
         player.insertImage(payload);
@@ -141,15 +150,5 @@ public class PacketBuffer {
         return null;
     }
 
-    public void updateStatsViewGui() {
-        if (stats == null) return;
-        view.updateStatsGui(
-                stats.getTotalBytes(),
-                stats.getPacketsLostFraction(),
-                stats.getLostPackets(),
-                stats.getDataRate(),
-                stats.getHighestSeqNr()
-        );
-    }
 }
 

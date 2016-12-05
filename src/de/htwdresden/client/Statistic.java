@@ -35,7 +35,7 @@ public class Statistic {
     }
 
     public float getPacketsLostFraction() {
-        return (float) packetsLost / highestSeqNr;
+        return highestSeqNr == 0 ? 0 : (float) packetsLost / highestSeqNr;
     }
 
     public int getLostPackets() {

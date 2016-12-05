@@ -75,7 +75,7 @@ public class Server extends JFrame {
 
     final static String CRLF = "\r\n";
 
-    private OnTimerListener onTimerListener;
+    private SendPacketTimer sendPacketTimer;
 
 
     JPanel mainPanel = new JPanel();
@@ -92,8 +92,8 @@ public class Server extends JFrame {
         super("Server");
 
         //init Timer
-        onTimerListener = new OnTimerListener();
-        timer = new Timer(FRAME_PERIOD, onTimerListener);
+        sendPacketTimer = new SendPacketTimer();
+        timer = new Timer(FRAME_PERIOD, sendPacketTimer);
         timer.setInitialDelay(0);
         timer.setCoalesce(true);
 
@@ -116,7 +116,7 @@ public class Server extends JFrame {
         packetsForOneFecCodePacketSlider.addChangeListener(e -> {
             if (fecBuffer != null) fecBuffer.changeK(dropRateSlider.getValue());
         });
-        dropRateSlider.addChangeListener(e -> onTimerListener.setSkipRate(dropRateSlider.getValue() / 100.0f));
+        dropRateSlider.addChangeListener(e -> sendPacketTimer.setSkipRate(dropRateSlider.getValue() / 100.0f));
         initSlider(dropRateSlider, 0, 100, 10, 0);
         initSlider(packetsForOneFecCodePacketSlider, 2, 20, 2, 2);
         getContentPane().add(label, BorderLayout.NORTH);
@@ -312,7 +312,7 @@ public class Server extends JFrame {
     }
 
 
-    class OnTimerListener implements ActionListener {
+    class SendPacketTimer implements ActionListener {
 
         Random random = new Random();
         private float skipRatePercent = 0;
