@@ -3,9 +3,12 @@ package de.htwdresden.packets;
 import java.util.Stack;
 
 /**
- * This is Fec Buffer, which stores packets, sent to client.
+ * This is Fec Packet Network Manager,
+ * which stores packets, sent to client from server.
  * After number of sent packets riches the k,
  * it sends a Fec packet with xored rtp packets stored previously.
+ * @see IPacketsSender class, which implements the functionality
+ * and handles the sending of packets to client
  */
 public class FecPacketNetworkManager {
     private IPacketsSender packetsSender = null;
@@ -18,6 +21,12 @@ public class FecPacketNetworkManager {
         this.k = k;
     }
 
+    /**
+     * Adds RTP packets to buffer. After the packet number riched
+     * the K @see FecPacketNetworkManager.k,
+     * it creates and sends new FEC packet.
+     * @param packet
+     */
     public void addPacket(RtpPacket packet) {
         packets.push(packet);
         if (packets.size() % k == 0) {
@@ -29,6 +38,7 @@ public class FecPacketNetworkManager {
     public void changeK(int k) {
         if (k > 0) this.k = k;
     }
+
     /*
     * The length recovery field is used to determine the length of any
    recovered packets.  It is computed via the protection operation
@@ -44,6 +54,10 @@ public class FecPacketNetworkManager {
    two media packets is 3 (0b011) and 5 (0b101) bytes, respectively.
    The length recovery field is then encoded as 0b011 xor 0b101 = 0b110. */
 
+    /**
+     * Creates FEC packet from Kx RTP packets.
+     * @return FEC packet.
+     */
     private FecPacket buildNewFecPacket() {
         RtpPacket packet = packets.pop();
         int xoredPayloadLength = packet.getPayloadLength();

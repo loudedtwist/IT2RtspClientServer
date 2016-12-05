@@ -6,6 +6,9 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 
+/**
+ * Send packets to client. Class used to send Fec packet over the UDP Socket
+ */
 public class FecPacketsSender implements IPacketsSender{
     private DatagramSocket updSocket; //updSocket to be used to send and receive UDP packets
 
@@ -13,12 +16,22 @@ public class FecPacketsSender implements IPacketsSender{
     private InetAddress clientIpAddress; //Client IP address
     private int clientPort = 0; //destination port for RTP packets  (given by the RTSP Client)
 
+    /**
+     * Constructor of FecPacketsSender
+     * @param clientIpAddress ip address of the client
+     * @param port port of the client
+     * @throws SocketException if something went wrong
+     */
     public FecPacketsSender(InetAddress clientIpAddress, int port) throws SocketException {
         this.updSocket = new DatagramSocket();
         this.clientIpAddress = clientIpAddress;
         this.clientPort = port;
     }
 
+    /**
+     * Send packet to client.
+     * @param packet packet to send.
+     */
     @Override
     public void sendPacket(Packet packet) {
 
