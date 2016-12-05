@@ -262,7 +262,7 @@ public class Client implements ClientView {
         public void actionPerformed(ActionEvent e) {
 
             System.out.println("play Button pressed !");
-            stats = Statistic.start();
+            stats = Statistic.Start();
             packetBuffer = new PacketBuffer(stats, new VideoPlayer(Client.this));
             if (state == READY) {
 
@@ -279,7 +279,7 @@ public class Client implements ClientView {
                     state = PLAYING;
                     System.out.println("New RTSP state: PLAYING");
 
-                    //start the recrivePacketTimer
+                    //Start the recrivePacketTimer
                     recrivePacketTimer.start();
                     updateLabelsTimer.start();
                 }

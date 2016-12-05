@@ -74,6 +74,9 @@ public class PacketBuffer {
         stats.increaseTotalBytes(length);
     }
 
+    /**
+     * Starts timer, the first time @see PacketBuffer receives packet
+     */
     private void startPlayAtFirstPacket() {
         if (firstPacket) {
             firstPacket = false;
@@ -83,6 +86,9 @@ public class PacketBuffer {
         }
     }
 
+    /**
+     * Timer, starts @see #findNextImageForVideoPlayer every (2x FPS) sec.
+     */
     private class FillVideoPlayerQueueTimer extends TimerTask {
         @Override
         public void run() {
@@ -91,6 +97,11 @@ public class PacketBuffer {
         }
     }
 
+    /**
+     * Takes rtp packet and look, whether it the expected sequence index.
+     * If not , than it tries to find lost packet in stored FEC packets.
+     * @param rtpPacket RTP packet received from server.
+     */
     private void findNextImageForVideoPlayer(RtpPacket rtpPacket) {
         if (rtpPacket == null) return;
         expectedPacketIndex++;

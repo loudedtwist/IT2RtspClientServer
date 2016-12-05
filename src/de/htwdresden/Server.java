@@ -197,7 +197,7 @@ public class Server extends JFrame {
             if ((request_type == PLAY) && (state == READY)) {
                 //send back response
                 theServer.send_RTSP_response();
-                //start timer
+                //Start timer
                 theServer.timer.start();
                 //update state
                 state = PLAYING;

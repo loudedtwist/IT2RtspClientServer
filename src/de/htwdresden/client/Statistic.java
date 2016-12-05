@@ -3,6 +3,10 @@ package de.htwdresden.client;
 import java.util.Timer;
 import java.util.TimerTask;
 
+/**
+ * Class encapsulate all statistic relevant data and calculations.
+ * @see Statistic#Start() creates new instance of Stastic class , starts the timer and returns it;
+ */
 public class Statistic {
     private double dataRate;         //Rate of video data received in bytes/s
     private int totalBytes;          //Total number of bytes received in a session
@@ -58,7 +62,7 @@ public class Statistic {
     private Statistic() {
     }
 
-    public static Statistic start() {
+    public static Statistic Start() {
         Statistic stats = new Statistic();
         stats.dataRate = 0;
         stats.totalBytes = 0;

@@ -6,7 +6,7 @@ import org.junit.Assert;
 public class StatisticTest {
     @org.junit.Test
     public void start() throws Exception {
-        Statistic stat = Statistic.start();
+        Statistic stat = Statistic.Start();
         double startTime = stat.getStartTime();
         System.out.println(" Start Time : " + startTime );
         Assert.assertTrue(startTime > 0 );
@@ -15,7 +15,7 @@ public class StatisticTest {
     }
     @org.junit.Test
     public void timer() throws Exception {
-        Statistic stat = Statistic.start();
+        Statistic stat = Statistic.Start();
         double startTime = stat.getStartTime();
 
         System.out.println(" Start Time : " + startTime );
