@@ -11,13 +11,24 @@ import java.util.*;
 /**
  * PacketBuffer takes packets(in bytes) from the client and stores it in it's buffer.
  * It's parse and stores RTP and FEC packets differently in Queue(RTP) and List(FEC).
- * After first packet has been stored it starts VideoPlayer and FillVideoPlayerQueueTimer.
+ * @see PacketBuffer#rtpPackets
+ * @see PacketBuffer#fecPackets
+ *
+ * After first packet has been stored, it starts VideoPlayer and FillVideoPlayerQueueTimer.
+ * @see PacketBuffer.FillVideoPlayerQueueTimer
+ *
  * FillVideoPlayerQueueTimer is started at double of speed of VideoPlayer. It takes
  * Packets saved from PacketBuffer, parses it sequentially and saves Frames stored in RTP Packets
  * in the VideoPlayer. If one of the packets missing PacketBuffer try to find it in FEC Packets.
  * If it find one, it stores in VideoPlayer the right one packet, elsewise it stores the next one.
- * This class also updates statistic data and provides data for VideoPlayer,
+ *
+ * This class also updates statistic data:
+ * @see PacketBuffer#stats
+ * and provides data for VideoPlayer:
+ * @see PacketBuffer#player
  * which is passed as dependency in the constructor and could be controlled by client.
+ *
+ * @see Texts.BufferTerminalOutput is used to print output log messages.
  */
 public class PacketBuffer {
 
@@ -31,7 +42,12 @@ public class PacketBuffer {
     private Timer timer;
     private boolean firstPacket = true;
 
-    public PacketBuffer(@NotNull Statistic stats, VideoPlayer videoPlayer) {
+    /**
+     * PacketBuffer constructor
+     * @param stats dependency Statistic class
+     * @param videoPlayer dependency VideoPlayer class
+     */
+    public PacketBuffer(@NotNull Statistic stats, @NotNull VideoPlayer videoPlayer) {
         this.stats = stats;
         player = videoPlayer;
         fecPackets = new ArrayList<>();
@@ -39,8 +55,12 @@ public class PacketBuffer {
         timer = new Timer();
     }
 
+    /**
+     * Takes bytes of RTP or FEC packet.
+     * @param data packet data
+     * @param length it's length
+     */
     public void addPacket(byte[] data, int length) {
-
         startPlayAtFirstPacket();
 
         RtpPacket rtpPacket = new RtpPacket(data, length);
