@@ -2,38 +2,51 @@ package de.htwdresden.packets;
 
 import static de.htwdresden.packets.RtpPacket.HEADER_SIZE_RTP;
 
+/**
+ * FecPacket handles creation from xor'ed packet and parameters
+ * and reconstruction from byte array, which represent the Fec packet.
+ * Fec packet has:
+ * @see FecPacket#rtpHeader RTP Header(for back compatibilities with clients,
+ * who don't implement Fec correction),
+ * @see FecPacket#fecHeader FEC Header with fields:
+ *      @see FecPacket#k number of encodet packets and
+ *      @see FecPacket#lastSeqNr last RTP packet encoded with this FEC packet and
+ * @see FecPacket#fecPayload wich has encoded ( XOR ) payload of K packets
+ * encoded in this FEC packet.
+ * This FecPacket has simplified FEC header and contains only k, sn, ts and length.
+ */
 public class FecPacket extends Packet {
-    //header
+
     public static final int PAYLOAD_TYPE_FEC = 127;
     static final int HEADER_SIZE_FEC = 10;
-    /*
-        FEC HEADER
-
-        0                   1                   2                   3
-        0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
-       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-       | K                             |            SN base            |
-       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-       |                          TS recovery                          |
-       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-       |        length recovery        |
-       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-       K - Anzahl der RTP Packeten im FEC Packet
-     */
-
     /*
         OUR FEC HEADER
 
         0                   1                   2                   3
         0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-       |K|L|P|X|  CC   |M| PT recovery |            SN base            |
+       | K                             |            SN                 |
        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
        |                          TS recovery                          |
        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
        |        length recovery        |
        +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
        K - Anzahl der RTP Packeten im FEC Packet
+       SN - Sequence index of last stored rtp packet
+     */
+
+    /*
+       FEC HEADER
+
+        0                   1                   2                   3
+        0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |E|L|P|X|  CC   |M| PT recovery |            SN base            |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |                          TS recovery                          |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |        length recovery        |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
      */
 
     /*
@@ -78,14 +91,6 @@ public class FecPacket extends Packet {
     //FEC HEADER - Kx xored RTP HEADER or simpler [2Bytes K]
     //XORED PAYLOAD - from Kx xored rtp packets
 
-    private static final int LONG_MASK = 0;
-
-    //The P recovery field, the X recovery field, the CC recovery field,
-    //the M recovery field, and the PT recovery field are obtained via the
-    //protection operation applied to the corresponding P, X, CC, M, and PT
-    //values from the RTP header of the media packets associated with the
-    //FEC packet.
-
     private byte[] rtpHeader;
     private byte[] fecHeader;
     public byte[] fecPayload;
@@ -102,7 +107,6 @@ public class FecPacket extends Packet {
     public FecPacket(RtpPacket xoredPacket, int k, int lastSeqNr, int lastTimeStamp, int xoredLengthOfAllEncodedPackets) {
         this.PayloadType = PAYLOAD_TYPE_FEC;
         this.TimeStamp = xoredPacket.getTimeStampFromHeader();
-        //this.SequenceNumber = rtpHeaderSeqNr;
 
         this.fecPayload = xoredPacket.payload;
         this.k = k;
@@ -110,9 +114,6 @@ public class FecPacket extends Packet {
         this.lastTimeStamp = lastTimeStamp;
 
         this.rtpHeader = RtpPacket.getInitializedHeader(PAYLOAD_TYPE_FEC, lastSeqNr, lastTimeStamp);
-
-        RtpPacket p = new RtpPacket(rtpHeader, rtpHeader.length);
-        int pt = p.getPayloadTypeFromHeader();
 
         this.fecHeader = FecPacket.getInitializedFecHeader(
                 k,
@@ -176,6 +177,10 @@ public class FecPacket extends Packet {
         return lastSeqNr - k + 1;
     }
 
+    /**
+     * returns text representation of this object
+     * @return text representation
+     */
     @Override
     public String toString() {
         String output = super.toString() + "\n";
