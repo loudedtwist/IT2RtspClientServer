@@ -24,7 +24,7 @@ public class VideoPlayer {
     }
 
     /**
-     * Starts VideoPlayer at fixed rate
+     * Starts VideoPlayer playback at fixed rate
      * @param fps frame pro second for the VideoPlayer
      * @param msDelay starts video playback after that delay
      */
@@ -34,7 +34,7 @@ public class VideoPlayer {
 
     /**
      * Public interface, used to insert images to play buffer.
-     * @param newImage
+     * @param newImage image bytes
      */
     public void insertImage(byte[] newImage){
         if(newImage == null || newImage.length == 0) return;

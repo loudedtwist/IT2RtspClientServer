@@ -2,8 +2,11 @@ package de.htwdresden;
 
 import de.htwdresden.packets.FecPacket;
 
-/*
+/**
 * Resource class with strings used in project
+ * @see Texts.BufferTerminalOutput stores text
+ * and has static methods to print log messages to output from
+ * @see de.htwdresden.client.PacketBuffer
 * */
 public  class Texts {
     static public String receivedBytes = "Received Bytes : ";
